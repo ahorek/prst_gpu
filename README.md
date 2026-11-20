@@ -8,11 +8,11 @@ By default, prst runs on the CPU. To enable GPU acceleration, use the -gpu flag.
 
 Run with GPU acceleration:
 ```
-./prst -log info "97768*5^987383-1" -gpu
+./prst -log info "3*2^1660962+1" -gpu
 ```
 Select a specific GPU (when multiple GPUs are available / without boinc):
 ```
-./prst -log info "97768*5^987383-1" -gpu 0
+./prst -log info "3*2^1660962+1" -gpu 0
 ```
 
 ## Benchmarking
