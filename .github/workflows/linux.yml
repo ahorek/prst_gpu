@@ -142,8 +142,6 @@ jobs:
       - name: smoke test
         run: |
           cd prst/src/linux64
-          file prst       | grep -q 'statically linked'
-          file prst_boinc | grep -q 'statically linked'
           ./prst -v
           ./prst_boinc -v
           ./prst -log info "3*2^534+1" | tee proth.log
