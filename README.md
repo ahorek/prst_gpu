@@ -7,21 +7,27 @@ By default, prst runs on the CPU. To enable GPU acceleration, use the -gpu flag.
 ## Usage
 
 Run with GPU acceleration:
-
+```
 ./prst_gpu -log info "97768*5^987383-1" -gpu
-
+```
 Select a specific GPU (when multiple GPUs are available / without boinc):
-
+```
 ./prst_gpu -log info "97768*5^987383-1" -gpu 0
+```
 
 ## Benchmarking
 
 You can benchmark performance to compare CPU vs GPU:
+```
 ./prst -benchmark time 10 -gpu -t 16
+```
 Or benchmark GPU performance only:
+```
 ./prst -benchmark gpu time 10 -gpu
+```
 
 Expected performance depends on the algorithm and the GPU/CPU combination. Modern GPUs should deliver performance comparable to, or better than, high-end CPUs. Example
+```
 CPS
 fft 2x720K
 Nvidia 5090    6291s
@@ -33,6 +39,7 @@ fft 3584K
 Nvidia 5090    7200s
 AMD 7900 xtx  19737s
 5950x (16t)   51251s
+```
 
 ## GPU support
 It should work on any modern GPU that supports OpenCL. However, performance may be really bad on GPUs older than the AMD RDNA or NVIDIA Turing architectures.
