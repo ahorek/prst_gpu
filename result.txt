@@ -1,0 +1,3 @@
+GPU not used: Morrison (LLR) test runs on the CPU. Use -fermat for a GPU Fermat test.
+3323*2^86-1 is prime! Time: 0 s.
+3323*2^86-1 is a probable prime. Time: 16 s.
