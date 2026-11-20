@@ -142,6 +142,7 @@ jobs:
       - name: smoke test
         run: |
           cd prst/src/linux64
+          export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/prst/framework/OpenCL-Headers/lib"
           ./prst -v
           ./prst_boinc -v
           ./prst -log info "3*2^534+1" | tee proth.log
