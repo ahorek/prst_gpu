@@ -1,0 +1,160 @@
+name: Linux build
+
+on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  boinc_ref: 82d0a3731c743884b6e7a25d68c6558eca691635  # client release 7.20.2
+  gwnum_ver: "v3107b01"
+  gwnum_ver_major: "31"
+  gwnum_ver_minor: "07"
+  cache_rev: "1"  # bump to invalidate all caches of this workflow
+
+jobs:
+  boinc-linux64:
+    runs-on: ubuntu-24.04
+    outputs:
+      cache-key: ${{ steps.key.outputs.key }}
+
+    steps:
+      - name: Compute cache key
+        id: key
+        run: echo "key=boinc-${{ runner.os }}-${{ runner.arch }}-${{ env.boinc_ref }}-linux64-gcc-v${{ env.cache_rev }}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache BOINC libs
+        id: cache-boinc-linux64
+        uses: actions/cache@v5
+        with:
+          path: |
+            boinc/*.*
+            boinc/api
+            boinc/lib
+          key: ${{ steps.key.outputs.key }}
+
+      - name: Checkout boinc
+        if: steps.cache-boinc-linux64.outputs.cache-hit != 'true'
+        uses: actions/checkout@v5
+        with:
+          repository: 'BOINC/boinc'
+          ref: ${{ env.boinc_ref }}
+          path: 'boinc'
+
+      - name: install deps
+        if: steps.cache-boinc-linux64.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake libtool pkg-config m4
+
+      - name: build boinc
+        if: steps.cache-boinc-linux64.outputs.cache-hit != 'true'
+        run: |
+          cd ./boinc/
+          ./_autosetup
+          ./configure --disable-server --disable-client --disable-manager --enable-libraries --enable-static --disable-shared
+          make -j$(nproc)
+
+  gwnum:
+    runs-on: ubuntu-24.04
+    outputs:
+      cache-key: ${{ steps.key.outputs.key }}
+
+    steps:
+      - name: Compute cache key
+        id: key
+        run: echo "key=gwnum-${{ runner.os }}-${{ runner.arch }}-${{ env.gwnum_ver }}-linux64-gcc-v${{ env.cache_rev }}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache gwnum.a libs
+        id: cache-gwnum-linux64
+        uses: actions/cache@v5
+        with:
+          path: |
+            gwnum/*.h
+            gwnum/gwnum.a
+            gwnum/polymult.a
+          key: ${{ steps.key.outputs.key }}
+
+      - name: Download p95
+        if: steps.cache-gwnum-linux64.outputs.cache-hit != 'true'
+        run: wget "https://www.mersenne.org/download/software/v${{ env.gwnum_ver_major }}/${{ env.gwnum_ver_major }}.${{ env.gwnum_ver_minor }}/p95${{ env.gwnum_ver }}.source.zip"
+
+      - name: unzip p95
+        if: steps.cache-gwnum-linux64.outputs.cache-hit != 'true'
+        run: unzip p95*.zip
+
+      - name: build gwnum.a and polymult.a
+        if: steps.cache-gwnum-linux64.outputs.cache-hit != 'true'
+        run: |
+          cd gwnum
+          make -f make64 -j gwnum.a polymult.a
+
+  linux64:
+    needs: [boinc-linux64, gwnum]
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Use cached BOINC libs
+        id: cache-boinc
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            boinc/*.*
+            boinc/api
+            boinc/lib
+          key: ${{ needs.boinc-linux64.outputs.cache-key }}
+          fail-on-cache-miss: true
+
+      - name: Use cached gwnum
+        id: cache-gwnum
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            gwnum/*.h
+            gwnum/gwnum.a
+            gwnum/polymult.a
+          key: ${{ needs.gwnum.outputs.cache-key }}
+          fail-on-cache-miss: true
+
+      - name: install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgmp-dev
+
+      - name: Checkout prst
+        uses: actions/checkout@v5
+        with:
+          submodules: 'true'
+          path: 'prst'
+
+      - name: copy gwnum
+        run: |
+          cp gwnum/*.h prst/framework/gwnum/
+          cp gwnum/gwnum.a prst/framework/gwnum/linux64/
+
+      - name: make
+        run: cd prst/src/linux64 && make -j$(nproc)
+
+      - name: make (boinc)
+        run: cd prst/src/linux64 && make -f Makefile.boinc BOINC_DIR=$GITHUB_WORKSPACE/boinc -j$(nproc)
+
+      - name: smoke test
+        run: |
+          cd prst/src/linux64
+          ln -s libOpenCL.so "$GITHUB_WORKSPACE/prst/framework/OpenCL-Headers/lib/libOpenCL.so.1"
+          export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/prst/framework/OpenCL-Headers/lib:${LD_LIBRARY_PATH:-}"
+          ./prst -v
+          ./prst_boinc -v
+          ./prst -log info "3*2^534+1" | tee proth.log
+          grep -q 'is prime!' proth.log
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: linux64_bins
+          path: |
+            prst/src/linux64/prst
+            prst/src/linux64/prst_boinc
+            gwnum/gwnum.a
+            gwnum/polymult.a
